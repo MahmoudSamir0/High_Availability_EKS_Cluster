@@ -184,3 +184,50 @@ variable "dynamodb-name" {
 }
 ```
 In this way we will create a table in dynamoDB called you can choose a different name using dynamodb-name variables  , unlike the bucket, the name of the table is not global and therefore there can be multiple tables with the same name, as long as are not in the same region of the same account). The primary key to be used to lock the state in dynamoDB must be called LockID and must be a “string” type (S).
+
+##### 2. s3 dir in all-modules 
+in *main.tf*
+```hcl
+resource "aws_s3_bucket" "tf-state" {
+  bucket = var.bucket-name
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_s3_bucket_versioning" "name" {
+  bucket = aws_s3_bucket.tf-state.id
+  versioning_configuration {
+    status = var.status
+  }
+}
+```
+in variables.tf
+```hcl
+variable "bucket-name" {
+  
+}
+
+variable "status" {
+  
+}
+```
+in output.tf
+```hcl
+output "bucket-arn" {
+  value = aws_s3_bucket.tf-state.arn
+}
+
+output "bucket-name" {
+  value = aws_s3_bucket.tf-state.bucket
+}
+output "bucket-id" {
+  value = aws_s3_bucket.tf-state.id
+}       
+output "domain" {
+  value = aws_s3_bucket.tf-state.bucket_regional_domain_name
+}
+```
+In this way we will create an s3 bucket called  (you can call it as you want useing bucket-name variable but remembering that the names of the s3 buckets in AWS are global, which means that it is not possible to use a name that has been used by someone else). In this case I decided to enable versioning so that every revision of the state file is stored, and is possible to roll back to an older version if something goes wrong. I decided to encrypt the contents of the bucket as the state file saves the infrastructure information and therefore also the sensitive data in plain-text. I also decided to enable the lock of objects in order to avoid deletion or overwriting.
+
