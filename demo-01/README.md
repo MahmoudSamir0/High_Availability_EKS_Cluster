@@ -282,6 +282,22 @@ Terraform will perform the following actions:
     }
 
 Plan: 3 to add, 0 to change, 0 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+module.dynamo.aws_dynamodb_table.name: Creating...
+module.s3-bucket.aws_s3_bucket.tf-state: Creating...
+module.s3-bucket.aws_s3_bucket.tf-state: Creation complete after 5s [id=terraform-update-and-run-state]
+module.s3-bucket.aws_s3_bucket_versioning.name: Creating...
+module.s3-bucket.aws_s3_bucket_versioning.name: Creation complete after 2s [id=terraform-update-and-run-state]
+module.dynamo.aws_dynamodb_table.name: Still creating... [10s elapsed]
+module.dynamo.aws_dynamodb_table.name: Creation complete after 10s [id=terraform-update-and-run-state]
+
+Apply complete! Resources: 3 added, 0 changed, 0 destroyed.
 ```
 ## now  s3 and dynamodb ready to create the backend in next demo
 # [demo-02](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/tree/master/demo-02)
