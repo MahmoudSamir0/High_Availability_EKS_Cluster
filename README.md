@@ -161,5 +161,26 @@ resource "aws_key_pair" "key" {
 └── Screenshot from 2023-07-23 23-15-22.png
 
 10 directories, 48 files
-
 ```
+Let's discuss our files
+##### 1. dynamodb dir in all-modules 
+in *main.tf*
+```hcl
+resource "aws_dynamodb_table" "name" {
+  name         = var.dynamodb-name
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "lockID"
+
+  attribute {
+    name = "lockID"
+    type = "S"
+  }
+}
+```
+in variables.tf
+```hcl
+variable "dynamodb-name" {
+  
+}
+```
+In this way we will create a table in dynamoDB called you can choose a different name using dynamodb-name variables  , unlike the bucket, the name of the table is not global and therefore there can be multiple tables with the same name, as long as are not in the same region of the same account). The primary key to be used to lock the state in dynamoDB must be called LockID and must be a “string” type (S).
