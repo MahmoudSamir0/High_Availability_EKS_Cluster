@@ -1305,13 +1305,13 @@ Do you want to perform these actions?
 # congratulations your app is ready 
 ## now now open app url (https://www.aspapp.com)
 ![app](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/blob/master/Screenshot%20from%202023-07-23%2023-15-22.png)
-##Destroy everything
+## Destroy everything
 
 And the last step is to destroy all infrastructure
 
 
 ```
-=> terraform destroy
+ terraform destroy
 ```
 then back to [demo-01](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/tree/master/demo-0) to destroy the backend
 
