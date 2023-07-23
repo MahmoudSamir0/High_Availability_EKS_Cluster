@@ -301,3 +301,12 @@ Apply complete! Resources: 3 added, 0 changed, 0 destroyed.
 ```
 ## now  s3 and dynamodb ready to create the backend in next demo
 # [demo-02](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/tree/master/demo-02)
+## Destroy everything
+
+And the last step is to destroy all infrastructure
+
+
+```
+ terraform destroy
+```
+then back to [demo-01](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/tree/master/demo-0) to destroy the backend
