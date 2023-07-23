@@ -1303,7 +1303,18 @@ Do you want to perform these actions?
 ```
 
 # congratulations your app is ready 
-## now now open app url (https://www.aspapp.com) 
+## now now open app url (https://www.aspapp.com)
+![app](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/blob/master/Screenshot%20from%202023-07-23%2023-15-22.png)
+##Destroy everything
+
+And the last step is to destroy all infrastructure
+
+
+```
+=> terraform destroy
+```
+then back to [demo-011](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/tree/master/demo-0) to destroy the backend
+
 # Notes:
 Be careful of Rout53 domain = 12$ for 12 month for domain
  
