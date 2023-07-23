@@ -404,5 +404,300 @@ output "vpc" {
 }
 
 ```
+##### 4. security dir in all-modules 
+
+in securityg.tf
+
+```hcl
+resource "aws_security_group" "eks_cluster" {
+  name_prefix = "eks_cluster_"
+  description = "Security group for EKS cluster"
+  vpc_id = var.vpc-id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+```
+we create Security group for EKS cluster 
 
 
+in variable.tf
+
+```hcl
+variable "vpc-id" {
+  
+}
+
+```
+```hcl
+output "eks-secgrp" {
+  value = aws_security_group.eks_cluster.id
+}
+
+```
+##### 4. IAM dir in all-modules 
+in main.tf 
+
+```hcl
+
+resource "aws_iam_role" "eks-iam-role" {
+ name = "eks-iam-role"
+
+ path = "/"
+
+ assume_role_policy = <<EOF
+{
+ "Version": "2012-10-17",
+ "Statement": [
+  {
+   "Effect": "Allow",
+   "Principal": {
+    "Service": "eks.amazonaws.com"
+   },
+   "Action": "sts:AssumeRole"
+  }
+ ]
+}
+EOF
+
+}
+
+
+resource "aws_iam_role_policy_attachment" "AmazonEKSClusterPolicy" {
+ policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+ role    = aws_iam_role.eks-iam-role.name
+}
+resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly-EKS" {
+ policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+ role    = aws_iam_role.eks-iam-role.name
+}
+
+resource "aws_iam_policy" "ecr-cluster-access" {
+  name        = "eks-ecr-access"
+  policy      = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:GetRepositoryPolicy",
+          "ecr:DescribeRepositories",
+          "ecr:ListImages",
+          "ecr:DescribeImages",
+          "ecr:BatchGetImage",
+          "ecr:GetLifecyclePolicy",
+          "ecr:GetLifecyclePolicyPreview",
+          "ecr:ListTagsForResource",
+          "ecr:DescribeImageScanFindings",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+          "ecr:PutImage",
+          "ecr:DeleteRepository",
+          "ecr:BatchDeleteImage",
+          "ecr:SetRepositoryPolicy",
+          "ecr:TagResource",
+          "ecr:UntagResource",
+          "ecr:GetRegistryPolicy",
+          "ecr:PutRegistryPolicy"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+
+resource "aws_iam_role_policy_attachment" "ecr-cluster-access" {
+  policy_arn = aws_iam_policy.ecr-cluster-access.arn
+  role       = aws_iam_role.eks-iam-role.name
+}
+
+
+resource "aws_iam_role" "workernodes" {
+  name = "eks-node-group-example"
+ 
+  assume_role_policy = jsonencode({
+   Statement = [{
+    Action = "sts:AssumeRole"
+    Effect = "Allow"
+    Principal = {
+     Service = "ec2.amazonaws.com"
+    }
+   }]
+   Version = "2012-10-17"
+  })
+ }
+
+ resource "aws_iam_role_policy_attachment" "AmazonEKSWorkerNodePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role    = aws_iam_role.workernodes.name
+ }
+ 
+ resource "aws_iam_role_policy_attachment" "AmazonEKS_CNI_Policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role    = aws_iam_role.workernodes.name
+ }
+ 
+ resource "aws_iam_role_policy_attachment" "EC2InstanceProfileForImageBuilderECRContainerBuilds" {
+  policy_arn = "arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilderECRContainerBuilds"
+  role    = aws_iam_role.workernodes.name
+ }
+ 
+ resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role    = aws_iam_role.workernodes.name
+ }
+```
+ The two policies allow you to properly access EC2 instances,Allow EKS cluster access to ECR registry, Set up an IAM role for the worker nodes.
+ 
+in output.tf 
+
+```hcl
+output "worker-role" {
+  value = aws_iam_role.workernodes.arn
+}
+
+output "eks-role" {
+  value = aws_iam_role.eks-iam-role.arn
+}
+```
+
+
+##### 5. eks dir in all-modules 
+
+in main.tf
+
+```hcl
+resource "aws_eks_cluster" "ekscluster" {
+ name = var.eksName
+ role_arn = var.eks-role
+ vpc_config {
+  subnet_ids = var.subnet-id
+  endpoint_private_access = true
+  endpoint_public_access  = false
+  security_group_ids = [ var.eks-secgrp ]
+ }
+
+ depends_on = [
+  var.eks-role,
+ ]
+}
+
+ resource "aws_eks_node_group" "worker-node-group" {
+  cluster_name  = aws_eks_cluster.ekscluster.name
+  node_group_name = var.node_group_name
+  node_role_arn  =  var.worker
+  subnet_ids   = var.subnet-id
+  instance_types = ["t2.medium"]
+ 
+
+  scaling_config {
+    desired_size = var.desired_size
+    max_size     = var.max_size
+    min_size     = var.min_size
+  }
+  depends_on = [
+   var.worker
+  ]
+ }
+
+```
+create eks cluster with node you can change number of node in every subnet 
+
+in output.tf
+
+```hcl
+
+output "worker" {
+  value = aws_eks_node_group.worker-node-group.id
+}
+
+output eksEndpoint {
+    value = aws_eks_cluster.ekscluster.endpoint
+}
+output "certificate_authority" {
+  value = aws_eks_cluster.ekscluster.certificate_authority[0].data
+}
+output "eksname" {
+  value = aws_eks_cluster.ekscluster.name
+}
+output "cluster_id" {
+  value = aws_eks_cluster.ekscluster.cluster_id
+}
+output "cluster_oidc_issuer_url" {
+  value = aws_eks_cluster.ekscluster.identity[0].oidc[0].issuer
+}
+
+```
+
+in variables.tf
+
+```hcl
+variable "subnet-id" {
+  type = list
+}
+
+variable "vpc-id" {
+  
+}
+variable "eks-secgrp" {
+  
+}
+
+variable "eks-role" {
+  
+}
+
+variable "worker" {
+  
+}
+variable "eksName" {
+  
+}
+variable "desired_size" {
+  
+}
+variable "max_size" {
+  
+}
+variable "min_size" {
+  
+}
+variable "node_group_name" {
+  
+}
+```
+
+##### 6. cluster-autoscaler dir in all-modules 
+
+you can use module for [autoscale](https://registry.terraform.io/modules/DNXLabs/eks-cluster-autoscaler/aws/latest) node 
