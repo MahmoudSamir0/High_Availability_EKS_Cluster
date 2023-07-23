@@ -461,7 +461,7 @@ output "eks-secgrp" {
 }
 
 ```
-##### 4. IAM dir in all-modules 
+##### 5. IAM dir in all-modules 
 in main.tf 
 
 ```hcl
@@ -593,7 +593,7 @@ output "eks-role" {
 ```
 
 
-##### 5. eks dir in all-modules 
+##### 6. eks dir in all-modules 
 
 in main.tf
 
@@ -698,6 +698,378 @@ variable "node_group_name" {
 }
 ```
 
-##### 6. cluster-autoscaler dir in all-modules 
+##### 7. cluster-autoscaler dir in all-modules 
 
-you can use module for [autoscale](https://registry.terraform.io/modules/DNXLabs/eks-cluster-autoscaler/aws/latest) node 
+you can use module for [autoscale](https://registry.terraform.io/modules/DNXLabs/eks-cluster-autoscaler/aws/latest) node from terraform
+but here there is problem with this module so i edit it  to use it 
+
+##### 8.demo-01
+in s3.tf
+setup the remote state bucket
+```hcl
+module "s3-bucket" {
+  source      = "../all-modules/s3/"
+  bucket-name = "terraform-update-and-run-state"
+  status      = "Enabled"
+}
+```
+
+Terraform S3 backend allows you to define a dynamodb table that can be used to store state locking status. To create and use a table set dynamodb_state_locking to true.
+
+```hcl
+module "dynamo" {
+  source        = "../all-modules/dynamodb"
+  dynamodb-name = "terraform-update-and-run-state"
+}
+```
+
+
+##### 9.demo-02
+
+in backend.tf
+
+```hcl
+terraform {
+  backend "s3" {
+    #put your s3 here
+    bucket = "terraform-update-and-run-state"
+    key    = "dev/terraform.tfstate"
+    region = "us-east-1"
+
+
+    #put your dynamodb here
+    dynamodb_table = "terraform-update-and-run-state"
+    encrypt         = true
+  }
+}
+
+```
+in demo-01 we create s3 bucket and dynamodb to store our tfstate file here we create our backend to upload the tfstate
+
+in network&security.tf
+
+```hcl
+module "network" {
+  source          = "../all-modules/network"
+  subnet_name_az1 = ["public_subnet_az1", "private_subnet_az1"]
+  subnet_id_az1   = ["10.0.0.0/24", "10.0.1.0/24"]
+  subnet_id_az2   = ["10.0.3.0/24", "10.0.4.0/24"]
+  subnet_name_az2 = ["public_subnet_az2", "private_subnet_az2"]
+  nat-name        = "nat-ec1"
+  route-nat       = "myprivate_nat-1"
+  rout-public     = "Public Route Table"
+  internet-get    = "internet-getway"
+  true-and-false  = ["true", "false"]
+}
+module "security" {
+  source = "../all-modules/security"
+  vpc-id = module.network.vpc
+}
+
+```
+in iam.tf 
+
+```hcl
+module "IAM" {
+  source = "../all-modules/IAM"
+}
+resource "aws_iam_openid_connect_provider" "default" {
+  url = module.ekscluster.cluster_oidc_issuer_url
+
+  client_id_list = [
+"sts.amazonaws.com"]
+
+  thumbprint_list = [ aws_acm_certificate.cert.arn]
+}
+
+```
+
+
+in ekscluster.tf
+
+ ```hcl
+ module "ekscluster" {
+  source = "../all-modules/eks"
+  subnet-id=[module.network.private_subnet_ip_az1 ,module.network.private_subnet_ip_az2]
+  vpc-id=module.network.vpc
+  eks-secgrp=module.security.eks-secgrp
+  eks-role=module.IAM.eks-role
+  worker=module.IAM.worker-role
+  eksName="new_eks"
+  desired_size=1
+  max_size=1
+  min_size=1
+  node_group_name="new_node_group"
+}
+ ```
+ 
+ in domainssl.tf
+ 
+ 
+ ```hcl
+resource "aws_acm_certificate" "cert" {
+  domain_name       = "aspapp.com"
+  validation_method = "DNS"
+
+}
+resource "aws_route53_zone" "primary" {
+  name = "aspapp.com"
+}
+resource "aws_route53_record" "www" {
+  zone_id = aws_route53_zone.primary.zone_id
+  name    = "www.aspapp.com"
+  type    = "A"
+  ttl     = "300"
+  records = [kubernetes_service.aspapp_service.status.0.load_balancer.0.ingress.0.hostname]
+}
+ ```
+ 
+ in kubernetes.tf
+ 
+ ```hcl
+ provider "kubernetes" {
+  host                   = module.ekscluster.eksEndpoint
+  cluster_ca_certificate = base64decode(module.ekscluster.certificate_authority)
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    args        = ["eks", "get-token", "--cluster-name", module.ekscluster.eksname ]
+    command     = "aws"
+  }
+}
+
+resource "kubernetes_deployment" "aspapp" {
+  
+  metadata {
+    name = "aspapp"
+    labels = {
+      app = "aspapp"
+    }
+  }
+
+  spec {
+    replicas = 3
+
+    selector {
+      match_labels = {
+        app = "aspapp"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          app = "aspapp"
+        }
+      }
+
+      spec {
+        container {
+          image = "2534m/aspnetapp:latest"
+          name  = "aspapp"
+
+          port {
+            container_port = 80
+          }
+        }
+      }
+    }
+  }
+depends_on = [ module.ekscluster ]
+}
+
+resource "kubernetes_service" "aspapp_service" {
+  metadata {
+    name = "aspapp"
+  }
+
+  spec {
+    selector = {
+      app = kubernetes_deployment.aspapp.spec.0.template.0.metadata[0].labels.app
+    }
+    port {
+      port        = 80
+      target_port = 80
+    }
+
+    type = "LoadBalancer"
+  }
+  depends_on = [ kubernetes_deployment.aspapp ]
+}
+
+resource "kubernetes_horizontal_pod_autoscaler" "example" {
+  metadata {
+    name = "aspapp"
+  }
+
+  spec {
+    min_replicas = 3
+    max_replicas = 100
+
+    scale_target_ref {
+      kind = "Deployment"
+      name = "aspapp"
+    }
+
+    metric {
+      type = "External"
+      external {
+        metric {
+          name = "latency"
+          selector {
+            match_labels = {
+              lb_name = split("-", split(".", kubernetes_service.aspapp_service.status.0.load_balancer.0.ingress.0.hostname).0).0
+
+            }
+          }
+        }
+        target {
+          type  = "Value"
+          value = "100"
+        }
+      }
+    }
+  }
+  depends_on = [ module.ekscluster ]
+}
+
+
+resource "kubernetes_deployment" "sqlserver" {
+  metadata {
+    name = "sqlserver"
+  }
+
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = {
+        app = "sqlserver"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          app = "sqlserver"
+        }
+      }
+
+      spec {
+        container {
+          image = "microsoft/mssql-server:2017-latest"  
+          name  = "sqlserver"
+
+          port {
+            container_port = 1433
+          }
+
+          env {
+            name = "ACCEPT_EULA"
+            value = "Y"
+          }
+
+          env {
+            name = "SA_PASSWORD"
+            value = "12345mahmoud" 
+          }
+        }
+      }
+    }
+  } 
+    depends_on = [ module.ekscluster ]
+
+}
+
+resource "kubernetes_service" "sqlserver" {
+  metadata {
+    name = "sqlserver"
+  }
+
+  spec {
+    selector = {
+      app = kubernetes_deployment.sqlserver.spec.0.template.0.metadata[0].labels.app
+    }
+
+    port {
+      port        = 1433
+      target_port = 1433 
+    }
+  }
+    depends_on = [ module.ekscluster ]
+}
+
+ ```
+ in helm.tf
+ 
+ ```hcl
+ provider "helm" {
+  kubernetes {
+ host                   = module.ekscluster.eksEndpoint
+  cluster_ca_certificate = base64decode(module.ekscluster.certificate_authority)
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    args        = ["eks", "get-token", "--cluster-name", module.ekscluster.eksname ]
+    command     = "aws"
+  }
+  }
+}
+module "cluster_autoscaler" {
+  source = "../all-modules/cluster-autoscaler"
+
+  enabled = true
+
+  cluster_name                     = module.ekscluster.cluster_id
+  cluster_identity_oidc_issuer     = module.ekscluster.cluster_oidc_issuer_url
+  cluster_identity_oidc_issuer_arn = aws_iam_openid_connect_provider.default.arn
+  aws_region                       = "us-east-1"
+}
+
+resource "helm_release" "my-redis-cache" {
+  name       = "my-redis-cache"
+  repository = "https://charts.bitnami.com/bitnami"
+  chart      = "redis"
+  version    = "17.13.2"
+
+  set {
+    name  = "cluster.enabled"
+    value = "true"
+  }
+
+set {
+  name = "replica.autoscaling"
+  value = "true"
+}
+set {
+  name = "global.redis.password"
+  value = "12345mahmoud"
+}
+set {
+  name = "auth.password"
+  value = "12345mahmoud"
+}
+depends_on = [ module.ekscluster ]
+}
+
+resource "helm_release" "my-mongodb" {
+  name       = "my-mongodb"
+  repository = "https://charts.bitnami.com/bitnami"
+  chart      = "mongodb"
+  version    = "13.16.0"
+
+  set {
+    name  = "auth.rootPassword"
+  value = "12345mahmoud"
+  }
+
+  set {
+    name  = "auth.rootUser"
+    value = "mahmoud"
+  }
+  depends_on = [ module.ekscluster ]
+
+}
+ ```
+ 
+ ## Setup 
+ begin from [demo-01](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/tree/master/demo-01) 
+ 
