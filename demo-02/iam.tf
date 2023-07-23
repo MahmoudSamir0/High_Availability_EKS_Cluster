@@ -7,6 +7,6 @@ resource "aws_iam_openid_connect_provider" "default" {
   client_id_list = [
 "sts.amazonaws.com"]
 
-  thumbprint_list = [ module.acm. acm_certificate_arn ]
+  thumbprint_list = [ aws_acm_certificate.cert.arn]
 }
 
