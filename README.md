@@ -230,4 +230,179 @@ output "domain" {
 }
 ```
 In this way we will create an s3 bucket called  (you can call it as you want useing bucket-name variable but remembering that the names of the s3 buckets in AWS are global, which means that it is not possible to use a name that has been used by someone else). In this case I decided to enable versioning so that every revision of the state file is stored, and is possible to roll back to an older version if something goes wrong. I decided to encrypt the contents of the bucket as the state file saves the infrastructure information and therefore also the sensitive data in plain-text. I also decided to enable the lock of objects in order to avoid deletion or overwriting.
+##### 3. network dir in all-modules 
+in vpc.tf
+```hcl
+resource "aws_vpc" "myvpc" {
+  cidr_block = "10.0.0.0/16"
+}
+```
+here we want to create 1 vpc cidr block (10.0.0.0/16)
+
+
+in subnet.tf
+```hcl
+resource "aws_subnet" "mysub_az1" {
+  vpc_id                  = aws_vpc.myvpc.id
+  count                   = length(var.subnet_id_az1)
+  cidr_block              = var.subnet_id_az1[count.index]
+  map_public_ip_on_launch = var.true-and-false[count.index]
+  availability_zone       = "us-east-1a"
+  tags = {
+    Name = var.subnet_name_az1[count.index]
+  }
+}
+
+resource "aws_subnet" "mysub_az2" {
+  vpc_id                  = aws_vpc.myvpc.id
+  count                   = length(var.subnet_id_az2)
+  cidr_block              = var.subnet_id_az2[count.index]
+  map_public_ip_on_launch = var.true-and-false[count.index]
+  availability_zone       = "us-east-1b"
+  tags = {
+    Name = var.subnet_name_az2[count.index]
+  }
+}
+```
+we want to create subnet in each zone any number we need and we can choose if we want that subnet to be private or to be public
+
+in internet.tf
+
+```hcl
+resource "aws_internet_gateway" "it" {
+  vpc_id = aws_vpc.myvpc.id
+
+  tags = {
+    Name = var.internet-get
+  }
+}
+resource "aws_route_table" "myroute" {
+  vpc_id = aws_vpc.myvpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.it.id
+  }
+  tags = {
+    Name = var.rout-public
+  }
+}
+
+
+resource "aws_route_table_association" "myrout-a" {
+  subnet_id      = aws_subnet.mysub_az1[0].id
+  route_table_id = aws_route_table.myroute.id
+}
+
+resource "aws_route_table_association" "myrout-b" {
+  subnet_id      = aws_subnet.mysub_az2[0].id
+  route_table_id = aws_route_table.myroute.id
+}
+```
+we create internet gateway and apply route table for each public subnet
+
+
+in elastic.tf 
+```hcl
+resource "aws_eip" "elastic_id" {
+  vpc = true
+   tags = {
+    Name = "master_eip"
+  }
+}
+```
+we need elastic ip for natgeteway 
+
+in nat.tf 
+```hcl
+resource "aws_nat_gateway" "gw" {
+  subnet_id     = aws_subnet.mysub_az1[0].id
+  allocation_id = aws_eip.elastic_id.id
+
+  tags = {
+    "name" = var.nat-name
+  }
+}
+```
+natgateway for private subnet to connect to internet
+
+in rout-privet.tf
+```hcl
+resource "aws_route_table" "privett" {
+  vpc_id = aws_vpc.myvpc.id
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.gw.id
+  }
+
+  tags = {
+    Name = var.route-nat
+  }
+}
+
+resource "aws_route_table_association" "privett-a" {
+  subnet_id      = aws_subnet.mysub_az1[1].id
+  route_table_id = aws_route_table.privett.id
+}
+```
+
+in variables.tf
+
+```hcl
+variable "subnet_name_az1" {
+  type = list(any)
+}
+variable "subnet_name_az2" {
+  type = list(any)
+}
+variable "subnet_id_az1" {
+  type = list(any)
+}
+
+variable "subnet_id_az2" {
+  type = list(any)
+}
+variable "nat-name" {
+  type = string
+
+}
+variable "route-nat" {
+  type = string
+}
+variable "rout-public" {
+  type = string
+}
+variable "internet-get" {
+  type = string
+}
+
+variable "true-and-false" {
+  type = list(any)
+}
+
+```
+in output
+```hcl
+output "public_subnet_ip_az1" {
+  value = aws_subnet.mysub_az1[0].id
+
+}
+output "public_subnet_ip_az2" {
+  value = aws_subnet.mysub_az2[0].id
+
+}
+output "private_subnet_ip_az1" {
+  value = aws_subnet.mysub_az1[1].id
+
+}
+output "private_subnet_ip_az2" {
+  value = aws_subnet.mysub_az2[1].id
+
+}
+output "vpc" {
+  value = aws_vpc.myvpc.id
+}
+
+```
+
 
