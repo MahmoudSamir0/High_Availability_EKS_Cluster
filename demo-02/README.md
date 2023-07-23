@@ -1303,7 +1303,7 @@ Do you want to perform these actions?
 ```
 
 # congratulations your app is ready 
-## now now open app url (https://www.aspapp.com)
+## now open app url (https://www.aspapp.com)
 ![app](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/blob/master/Screenshot%20from%202023-07-23%2023-15-22.png)
 ## Destroy everything
 
