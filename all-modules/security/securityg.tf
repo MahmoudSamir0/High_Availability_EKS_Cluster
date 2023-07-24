@@ -1,7 +1,7 @@
 resource "aws_security_group" "eks_cluster" {
   name_prefix = "eks_cluster_"
   description = "Security group for EKS cluster"
-  vpc_id = var.vpc-id
+  vpc_id      = var.vpc-id
 
   ingress {
     from_port   = 80

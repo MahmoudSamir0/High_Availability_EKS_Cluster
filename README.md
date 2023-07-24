@@ -999,6 +999,8 @@ resource "kubernetes_service" "sqlserver" {
 }
 
  ```
+here we install our app  and  our database sql sever using kubernetes provider but is not best practice to use it we recommend to use yml file 
+ 
  in helm.tf
  
  ```hcl
@@ -1069,6 +1071,8 @@ resource "helm_release" "my-mongodb" {
 
 }
  ```
+ here we install our [mongodb](https://artifacthub.io/packages/helm/bitnami/mongodb) and [redis](https://artifacthub.io/packages/helm/bitnami/redis) cache using helm release you can only edit only values  
+
  
  ## Setup 
  begin from [demo-01](https://github.com/MahmoudSamir0/High_Availability_EKS_Cluster/tree/master/demo-01) 

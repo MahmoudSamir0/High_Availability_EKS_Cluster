@@ -1,6 +1,6 @@
 resource "aws_eip" "elastic_id" {
   vpc = true
-   tags = {
+  tags = {
     Name = "master_eip"
   }
 }

@@ -7,6 +7,7 @@ resource "aws_acm_certificate" "cert" {
 resource "aws_route53_zone" "primary" {
   name = "aspapp.com"
 }
+
 resource "aws_route53_record" "www" {
   zone_id = aws_route53_zone.primary.zone_id
   name    = "www.aspapp.com"
@@ -14,3 +15,9 @@ resource "aws_route53_record" "www" {
   ttl     = "300"
   records = [kubernetes_service.aspapp_service.status.0.load_balancer.0.ingress.0.hostname]
 }
+
+
+locals {
+  lb_name = split("-", split(".", kubernetes_service.aspapp_service.status.0.load_balancer.0.ingress.0.hostname).0).0
+}
+

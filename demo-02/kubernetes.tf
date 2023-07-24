@@ -3,14 +3,14 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(module.ekscluster.certificate_authority)
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
-    args        = ["eks", "get-token", "--cluster-name", module.ekscluster.eksname ]
+    args        = ["eks", "get-token", "--cluster-name", module.ekscluster.eksname]
     command     = "aws"
   }
 }
 
 # Create Kubernetes deployment and service for asp app
 resource "kubernetes_deployment" "aspapp" {
-  
+
   metadata {
     name = "aspapp"
     labels = {
@@ -46,7 +46,7 @@ resource "kubernetes_deployment" "aspapp" {
       }
     }
   }
-depends_on = [ module.ekscluster ]
+  depends_on = [module.ekscluster]
 }
 
 resource "kubernetes_service" "aspapp_service" {
@@ -65,7 +65,7 @@ resource "kubernetes_service" "aspapp_service" {
 
     type = "LoadBalancer"
   }
-  depends_on = [ kubernetes_deployment.aspapp ]
+  depends_on = [kubernetes_deployment.aspapp]
 }
 # Create Kubernetes autoscaler
 resource "kubernetes_horizontal_pod_autoscaler" "example" {
@@ -101,7 +101,7 @@ resource "kubernetes_horizontal_pod_autoscaler" "example" {
       }
     }
   }
-  depends_on = [ module.ekscluster ]
+  depends_on = [module.ekscluster]
 }
 
 # Kubernetes deployment and service for SQL Server
@@ -128,7 +128,7 @@ resource "kubernetes_deployment" "sqlserver" {
 
       spec {
         container {
-          image = "microsoft/mssql-server:2017-latest"  
+          image = "microsoft/mssql-server:2017-latest"
           name  = "sqlserver"
 
           port {
@@ -136,19 +136,19 @@ resource "kubernetes_deployment" "sqlserver" {
           }
 
           env {
-            name = "ACCEPT_EULA"
+            name  = "ACCEPT_EULA"
             value = "Y"
           }
 
           env {
-            name = "SA_PASSWORD"
-            value = "12345mahmoud" 
+            name  = "SA_PASSWORD"
+            value = "12345mahmoud"
           }
         }
       }
     }
-  } 
-    depends_on = [ module.ekscluster ]
+  }
+  depends_on = [module.ekscluster]
 
 }
 
@@ -164,10 +164,10 @@ resource "kubernetes_service" "sqlserver" {
 
     port {
       port        = 1433
-      target_port = 1433 
+      target_port = 1433
     }
   }
-    depends_on = [ module.ekscluster ]
+  depends_on = [module.ekscluster]
 }
 
 

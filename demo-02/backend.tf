@@ -8,6 +8,6 @@ terraform {
 
     #put your dynamodb here
     dynamodb_table = "terraform-update-and-run-state"
-    encrypt         = true
+    encrypt        = true
   }
 }

@@ -1,12 +1,12 @@
 provider "helm" {
   kubernetes {
- host                   = module.ekscluster.eksEndpoint
-  cluster_ca_certificate = base64decode(module.ekscluster.certificate_authority)
-  exec {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    args        = ["eks", "get-token", "--cluster-name", module.ekscluster.eksname ]
-    command     = "aws"
-  }
+    host                   = module.ekscluster.eksEndpoint
+    cluster_ca_certificate = base64decode(module.ekscluster.certificate_authority)
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      args        = ["eks", "get-token", "--cluster-name", module.ekscluster.eksname]
+      command     = "aws"
+    }
   }
 }
 module "cluster_autoscaler" {
@@ -31,19 +31,19 @@ resource "helm_release" "my-redis-cache" {
     value = "true"
   }
 
-set {
-  name = "replica.autoscaling"
-  value = "true"
-}
-set {
-  name = "global.redis.password"
-  value = "12345mahmoud"
-}
-set {
-  name = "auth.password"
-  value = "12345mahmoud"
-}
-depends_on = [ module.ekscluster ]
+  set {
+    name  = "replica.autoscaling"
+    value = "true"
+  }
+  set {
+    name  = "global.redis.password"
+    value = "12345mahmoud"
+  }
+  set {
+    name  = "auth.password"
+    value = "12345mahmoud"
+  }
+  depends_on = [module.ekscluster]
 }
 
 resource "helm_release" "my-mongodb" {
@@ -54,14 +54,14 @@ resource "helm_release" "my-mongodb" {
 
   set {
     name  = "auth.rootPassword"
-  value = "12345mahmoud"
+    value = "12345mahmoud"
   }
 
   set {
     name  = "auth.rootUser"
     value = "mahmoud"
   }
-  depends_on = [ module.ekscluster ]
+  depends_on = [module.ekscluster]
 
 }
 
